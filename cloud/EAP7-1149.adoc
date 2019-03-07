@@ -1,0 +1,109 @@
+= <INSERT TITLE HERE>
+:author:            Jeff Mesnil
+:email:             jmesnil@redhat.com
+:toc:               left
+:icons:             font
+:idprefix:
+:idseparator:       -
+
+== Overview
+
+Managing an application running on WildFly in a cloud environment can be a complex task. Things like ensuring containers have access to necessary resources, scaling up and scale down efficiently, integrating with outside services and handling rollout of new versions are all complex tasks that require operation knowledge. An https://coreos.com/blog/introducing-operators.html[Operator] is a specialized form of Kubernetes / OpenShift controller that is meant to encode that kind of operation knowledge in software, allowing users to more easily manage their cloud applications. The goal of this feature is to develop and Operator for managing WildFly-based applications.
+
+== Issue Metadata
+
+=== Issue
+
+* https://issues.jboss.org/browse/WFCORE[WFCORE-XXXX]
+
+=== Related Issues
+
+* https://issues.jboss.org/browse/EAP7-1149[EAP7-1149]
+
+=== Dev Contacts
+
+* mailto:{email}[{author}]
+
+=== QE Contacts
+
+=== Testing By
+// Put an x in the relevant field to indicate if testing will be done by Engineering or QE. 
+// Discuss with QE during the Kickoff state to decide this
+[ ] Engineering
+
+[ ] QE
+
+=== Affected Projects or Components
+
+ * https://github.com/wildfly/wildfly[WildFly]
+ * https://github.com/openshift-s2i/s2i-wildfly[WildFly s2i]
+
+
+=== Other Interested Projects
+
+ * https://github.com/jboss-dockerfiles/wildfly[WildFly Docker image]
+ * Keycloak / Red Hat SSO
+ * RHPAM
+
+== Requirements
+
+
+=== Hard Requirements
+
+* Provide a Custom Resource Definition for an application based on a WildFly application server. The CRD will allow the user to:
+** Specify the name an application image that incorporates a WildFly server and an deployment that will be deployed by that server.
+*** The name can include either a fixed or floating tag.
+** Specify the desired number of replicas of that image
+** Specify whether the replicas are intended to form a High Availability cluster (default is true).
+** Specify whether the containers are intended to be 'stateful'. (Default TBD)
+** Specify information for interfaces for which a Service and Route should be established. (TBD -- perhaps expose 8080 by default with an option to disable that)
+** Specify information for interfaces for which a headless service should be established.
+** TBD Other configuration appropriate for the required Operator behavior
+* Provide an Operator that will
+ ** In reaction to deployment of a Custom Resource with the CRD's type start up a cluster of containers running the specified image, with the specified number of replicas.
+ ** If the containers are meant to form a High Availability cluster, perform scale up and scale down in a manner designed to optimize cluster efficiency
+ *** Start one container and then start the others, thus ensuring the later nodes see the first as the group coordinator, avoiding mergers.
+ *** TBD
+ ** If the containers are configured as stateful
+ *** Ensure the existence of the necessary persistent volume(s) and persistent volume claims necessary for each container to have access to its own writable persistence
+ **** If the necessary facilities to allow this are not available, container start should be aborted
+ *** Containers should be members of a StatefulSet rather than 
+ *** Appropriate transaction recovery activities should be performed
+ ** Establish the appropriate services and routes
+ ** Detect new versions of the image in the container catalog and take appropriate action.
+ *** Appropriate action TBD. Possibilities
+ **** Scale down to a min number of nodes, begin replacing old nodes with new until all old gone
+ **** Leave old and new both running in some sort of A/B scenario
+ **** Incorporate information about active sessions in all of this (this requires LB integration that is out of scope unless already present)
+ **** Etc
+ ** Integrate with 'observability' consumers. (All of these are vague thoughts)
+ *** Logging consumers
+ *** Jaeger consumers (sidecar agents or remote servers)
+ *** Prometheus servers, e.g. by installing custom resources to allow such servers to discover the WF containers
+ *** Health monitors
+* General points
+** Transaction recovery should work correctly for appropriately configured containers. 
+
+=== Nice-to-Have Requirements
+
+ * Ability to function on both plain Kubernetes and on OpenShift (with perhaps some functionality only available on OpenShift). Many OpenShift concepts have k8s analogues, so if the environment is k8s and not OpenShift then the operator should utilize the k8s ones.
+ * Operator managed scale up / scale down of the number of replicas (within a min and max defined in the CRD) based on metrics exposed by the containers.
+
+=== Non-Requirements
+
+ * Orchestration of the building of images or the creation of Custom Resource instances. The images are available in the container catalog; how they get there is out of scope.
+ * Facilitating operation of a container that embeds a messaging broker within the WildFly server (e.g. by ensuring it has access to a persistent volume.) Running an embedded broker within WildFly in the cloud is not recommended. Use an external messaging broker.
+
+//== Implementation Plan
+////
+Delete if not needed. The intent is if you have a complex feature which can 
+not be delivered all in one go to suggest the strategy. If your feature falls 
+into this category, please mention the Release Coordinators on the pull 
+request so they are aware.
+////
+== Test Plan
+
+== Community Documentation
+////
+Generally a feature should have documentation as part of the PR to wildfly master, or as a follow up PR if the feature is in wildfly-core. In some cases though the documentation belongs more in a component, or does not need any documentation. Indicate which of these will happen.
+////
